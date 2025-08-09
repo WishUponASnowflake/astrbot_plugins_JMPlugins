@@ -19,15 +19,16 @@ import json
 from astrbot.core.star.filter.permission import PermissionType
 from astrbot.api.star import StarTools
 
-global last_Picture_time, Current_Picture_time, CoolDownTime, flag01, white_list_group, white_list_user, block_list
+global last_Picture_time, Current_Picture_time, CoolDownTime, flag01, white_list_group, white_list_user, block_list,favor_list
 global last_random_time, Current_random_time, flag02
 global last_search_picture_time, Current_search_picture_time, flag03
 global last_search_comic_time, Current_search_comic_time, flag04
 global ispicture
 
+
 option_url = "./data/plugins/astrbot_plugins_JMPlugins/option.yml"
 
-global white_list_path, history_json_path, datadir, blocklist_path
+global white_list_path, history_json_path, datadir, blocklist_path,favorite_path
 
 
 def check_is_6or7_digits(str):
@@ -68,12 +69,13 @@ class MyPlugin(Star):
         print(ispicture, CoolDownTime)
 
         # 加载白名单
-        global datadir, white_list_path, history_json_path, blocklist_path, block_list
+        global datadir, white_list_path, history_json_path, blocklist_path, block_list,favorite_path,favor_list
         datadir = StarTools.get_data_dir("astrbot_plugins_JMPlugins")
         print(datadir)
         white_list_path = os.path.join(datadir, "white_list.json")
         history_json_path = os.path.join(datadir, "history.json")
         blocklist_path = os.path.join(datadir, "block_list.json")
+        favorite_path=os.path.join(datadir, "favorite.json")
 
         if not os.path.exists(white_list_path):
             with open(white_list_path, 'w') as file:
@@ -95,6 +97,14 @@ class MyPlugin(Star):
             with open(blocklist_path, 'r') as file:
                 data = json.load(file)
                 block_list = data["albumID"]
+
+        if not os.path.exists(favorite_path):
+            with open(favorite_path, 'w') as file:
+                json.dump({"albumID": []}, file)
+        else:
+            with open(favorite_path, 'r') as file:
+                data = json.load(file)
+                favor_list = data["albumID"]
 
     @filter.command_group("JM")
     async def jm_command_group(self, event: AstrMessageEvent):
@@ -151,6 +161,8 @@ class MyPlugin(Star):
         except:
             yield event.plain_result("未找到该本子")
             return
+
+        #查询tag是否包含圣娅
 
         # 放入json当中
         data = []
@@ -609,6 +621,64 @@ class MyPlugin(Star):
         except:
             yield event.plain_result("搜索失败")
             return
+
+    @jm_command_group.command("f")
+    async def jm_f_command(self, event: AstrMessageEvent,type:str, album_id: str):
+        ''' 这是一个 收藏JMid 指令组'''
+        if event.get_message_type() == MessageType.FRIEND_MESSAGE:
+            if event.get_sender_id() not in white_list_user:
+                yield event.plain_result("该指令仅限管理员使用")
+                return
+        if event.get_message_type() == MessageType.GROUP_MESSAGE:
+            if event.get_group_id() not in white_list_group:
+                yield event.plain_result("该群没有权限使用该指令")
+                return
+
+        global favor_list,favorite_path
+
+        if type == "add":
+            if album_id in favor_list:
+                yield event.plain_result("该本子已经在收藏夹中")
+                return
+            else:
+                favor_list.append(album_id)
+                with open(favorite_path, 'w') as file:
+                    data = {
+                        "albumID": favor_list,
+                    }
+                    json.dump(data, file)
+                yield event.plain_result("该本子已成功加入收藏夹")
+        if type == "remove":
+            if album_id in block_list:
+                favor_list.remove(album_id)
+                with open(favorite_path, 'w') as file:
+                    data = {
+                        "albumID": favor_list,
+                    }
+                    json.dump(data, file)
+                yield event.plain_result("该本子已成功移除收藏夹")
+
+        if type == "show":
+            if len(favor_list) == 0:
+                yield event.plain_result("收藏夹为空")
+                return
+            else:
+                result_str = ""
+                for aid in favor_list:
+                    result_str += f"{aid}\n"
+                botid = event.get_self_id()
+
+                from astrbot.api.message_components import Node, Plain, Image
+                node = Node(
+                    uin=botid,
+                    name="仙人",
+                    content=[
+                        Plain(f"收藏夹：\n{result_str}")
+                    ]
+                )
+                yield event.chain_result([node])
+
+
 
     @jm_command_group.command("help")
     async def jm_help_command(self, event: AstrMessageEvent):
