@@ -110,7 +110,7 @@ class MyPlugin(Star):
     async def jm_command_group(self, event: AstrMessageEvent):
         ...
 
-    @jm_command_group.command("name")
+    @jm_command_group.command("id")
     async def jm_name_command(self, event: AstrMessageEvent, name: str):
         global last_Picture_time, Current_Picture_time, flag01, Cover_tag, flag02
         Cover_tag = 0
