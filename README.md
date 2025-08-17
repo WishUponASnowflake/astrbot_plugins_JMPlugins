@@ -73,19 +73,21 @@ datadir = StarTools.get_data_dir("astrbot_plugins_JMPlugins")
 #导入包
 from astrbot.api.star import StarTools
 # 加载白名单
-global datadir, white_list_path, history_json_path,blocklist_path,block_list
+global datadir, white_list_path, history_json_path,blocklist_path,block_list,favorite_path
 datadir = StarTools.get_data_dir("astrbot_plugins_JMPlugins")
 print(datadir)
 white_list_path = os.path.join(datadir, "white_list.json")
 history_json_path = os.path.join(datadir, "history.json")
 blocklist_path = os.path.join(datadir, "block_list.json")
+favorite_path=os.path.join(datadir, "favorite.json")
 ```
 当中的导入删除，以及下面的加载白名单代码修改为
 ```
-global white_list_path, history_json_path
+global white_list_path, history_json_path,blocklist_path,favorite_path
 white_list_path="./data/plugins/astrbot_plugins_JMPlugins/white_list.json"
-history_json_path="./data/plugins/astrbot_plugins_JMPlugins/history.json"
+history_json_path="./data/plugins/astrbot_plugins_JMPlugins/history.json"  
 blocklist_path="./data/plugins/astrbot_plugins_JMPlugins/block_list.json"
+favorite_path="./data/plugins/astrbot_plugins_JMPlugins/favorite.json"
 ```
 
 ## 使用
