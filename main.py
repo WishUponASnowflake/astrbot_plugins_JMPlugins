@@ -114,7 +114,7 @@ class MyPlugin(Star):
         ...
 
     @jm_command_group.command("id")
-    async def jm_name_command(self, event: AstrMessageEvent, name: str):
+    async def jm_name_command(self, event: AstrMessageEvent, name: str,type:str="s"):
         global last_Picture_time, Current_Picture_time, flag01, Cover_tag, flag02,img_count
         Cover_tag = 0
         '''这是一个 搜索本子 指令'''
@@ -214,7 +214,11 @@ class MyPlugin(Star):
                 photo01 = client.get_photo_detail(photo.photo_id, False)
 
                 #下载封面和后面的几张图片
-                count=min(img_count,len(photo01))
+                if type.lower() == "f":
+                    count = min(img_count, len(photo01))
+                else:
+                    count = 1
+
                 print(count)
 
                 for i in range(count):
@@ -745,7 +749,7 @@ class MyPlugin(Star):
         ''' 这是一个 帮助 指令'''
         str = ""
         str += "本插件提供以下指令：\n"
-        str += "id [id]：获取本子名称(以及封面图)\n"
+        str += "id [id] {f/F}：获取本子名称(以及封面图),后面加上参数f/F会不只发送封面图，不添加参数默认只发送封面图\n"
         str += "rank [m/w/d/a]：获取本子排行榜\n"
         str += "rand：随机获取本子\n"
         str += "key [关键字]：根据关键字搜索本子\n"
