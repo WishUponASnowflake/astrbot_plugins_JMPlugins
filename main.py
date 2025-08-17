@@ -25,6 +25,8 @@ global last_search_picture_time, Current_search_picture_time, flag03
 global last_search_comic_time, Current_search_comic_time, flag04
 global ispicture
 
+global img_count
+
 
 option_url = "./data/plugins/astrbot_plugins_JMPlugins/option.yml"
 
@@ -59,9 +61,10 @@ class MyPlugin(Star):
         last_search_comic_time = 0
 
         # 加载设置
-        global ispicture, CoolDownTime
+        global ispicture, CoolDownTime,img_count
         self.config = config
         CoolDownTime = self.config["CD_Time"]
+        img_count = self.config["img_count"]
         if self.config["IsPicture"] >= 1:
             ispicture = True
         else:
@@ -112,9 +115,9 @@ class MyPlugin(Star):
 
     @jm_command_group.command("id")
     async def jm_name_command(self, event: AstrMessageEvent, name: str):
-        global last_Picture_time, Current_Picture_time, flag01, Cover_tag, flag02
+        global last_Picture_time, Current_Picture_time, flag01, Cover_tag, flag02,img_count
         Cover_tag = 0
-        '''这是一个 获取本子名字 指令'''
+        '''这是一个 搜索本子 指令'''
         if event.get_message_type() == MessageType.FRIEND_MESSAGE:
             if event.get_sender_id() not in white_list_user:
                 yield event.plain_result("该指令仅限管理员使用")
@@ -153,6 +156,8 @@ class MyPlugin(Star):
             yield event.plain_result("该本子已被屏蔽,请窒息")
             return
 
+        yield event.plain_result("正在搜索中，请稍后")
+
         album = ''
         try:
             client = JmOption.copy_option(option).new_jm_client()
@@ -162,7 +167,7 @@ class MyPlugin(Star):
             yield event.plain_result("未找到该本子")
             return
 
-        #查询tag是否包含圣娅
+
 
         # 放入json当中
         data = []
@@ -197,28 +202,62 @@ class MyPlugin(Star):
         botid = event.get_self_id()
         from astrbot.api.message_components import Node, Plain, Image
 
+        folder_path = './data/plugins/astrbot_plugins_JMPlugins/pic/'
+
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+
         if ispicture:
             # 下载封面
             try:
                 photo: JmPhotoDetail = album.getindex(0)
                 photo01 = client.get_photo_detail(photo.photo_id, False)
-                image: JmImageDetail = photo01[0]
-                if os.path.exists('./data/plugins/astrbot_plugins_JMPlugins/result.jpg'):
-                    os.remove('./data/plugins/astrbot_plugins_JMPlugins/result.jpg')
-                client.download_by_image_detail(image, './data/plugins/astrbot_plugins_JMPlugins/result.jpg')
 
-                # 给图片添加防gank
-                if os.path.exists('./data/plugins/astrbot_plugins_JMPlugins/result.jpg'):
-                    from PIL import Image as ProcessImage
-                    original_image = ProcessImage.open('./data/plugins/astrbot_plugins_JMPlugins/result.jpg')
-                    # 获取原始图片的宽度和高度
-                    width, height = original_image.size
-                    # 创建一张新的空白图片，大小为原图的宽度和五倍高度
-                    new_image = ProcessImage.new('RGB', (width, height * 5), color=(255, 255, 255))
-                    # 将原图粘贴到新图片的下半部分
-                    new_image.paste(original_image, (0, height * 4))
-                    # 保存最终结果
-                    new_image.save('./data/plugins/astrbot_plugins_JMPlugins/result.jpg')
+                #下载封面和后面的几张图片
+                count=min(img_count,len(photo01))
+                print(count)
+
+                for i in range(count):
+                    image: JmImageDetail = photo01[i]
+                    if os.path.exists(os.path.join(folder_path, f'{i}.jpg')):
+                        os.remove(os.path.join(folder_path, f'{i}.jpg'))
+                    client.download_by_image_detail(image, os.path.join(folder_path, f'{i}.jpg'))
+
+                #添加防gank
+                for i in range(count):
+                    image_path= os.path.join(folder_path, f'{i}.jpg')
+                    if os.path.exists(image_path):
+                        from PIL import Image as ProcessImage
+                        original_image = ProcessImage.open(image_path)
+                        # 获取原始图片的宽度和高度
+                        width, height = original_image.size
+                        # 创建一张新的空白图片，大小为原图的宽度和五倍高度
+                        new_image = ProcessImage.new('RGB', (width, height * 5), color=(255, 255, 255))
+                        # 将原图粘贴到新图片的下半部分
+                        new_image.paste(original_image, (0, height * 4))
+                        # 保存最终结果
+                        new_image.save(image_path)
+
+
+                # if os.path.exists('./data/plugins/astrbot_plugins_JMPlugins/result.jpg'):
+                #     os.remove('./data/plugins/astrbot_plugins_JMPlugins/result.jpg')
+                # client.download_by_image_detail(image, './data/plugins/astrbot_plugins_JMPlugins/result.jpg')
+                #
+                # # 给图片添加防gank
+                # if os.path.exists('./data/plugins/astrbot_plugins_JMPlugins/result.jpg'):
+                #     from PIL import Image as ProcessImage
+                #     original_image = ProcessImage.open('./data/plugins/astrbot_plugins_JMPlugins/result.jpg')
+                #     # 获取原始图片的宽度和高度
+                #     width, height = original_image.size
+                #     # 创建一张新的空白图片，大小为原图的宽度和五倍高度
+                #     new_image = ProcessImage.new('RGB', (width, height * 5), color=(255, 255, 255))
+                #     # 将原图粘贴到新图片的下半部分
+                #     new_image.paste(original_image, (0, height * 4))
+                #     # 保存最终结果
+                #     new_image.save('./data/plugins/astrbot_plugins_JMPlugins/result.jpg')
+
+                # 发送图片
+                all_nodes = []
 
                 node = Node(
                     uin=botid,
@@ -228,7 +267,8 @@ class MyPlugin(Star):
                         Plain("...\n"),
                         Plain(f"id:{album.id}\n"),
                         Plain(f"本子名称：{album.name}\n"),
-                        Plain(f"作者：{album.author}"),
+                        Plain(f"作者：{album.author}\n"),
+                        Plain(f"只会发送前{img_count}张图片，剩余的自己去搜打撤")
                     ]
                 )
                 tag_node = Node(
@@ -239,17 +279,37 @@ class MyPlugin(Star):
                         Plain(f"tags：{album.tags}\n")
                     ]
                 )
-                picture_node = Node(
-                    uin=botid,
-                    name="仙人",
-                    content=
-                    [
-                        Image.fromFileSystem("./data/plugins/astrbot_plugins_JMPlugins/result.jpg")
-                    ]
-                )
+                all_nodes.append(node)
+                all_nodes.append(tag_node)
+
+                for i in range(count):
+                    image_path= os.path.join(folder_path, f'{i}.jpg')
+                    if os.path.exists(image_path):
+                        picture_node = Node(
+                            uin=botid,
+                            name="仙人",
+                            content=
+                            [
+                                Image.fromFileSystem(image_path)
+                            ]
+                        )
+                        all_nodes.append(picture_node)
+
                 resNode = Nodes(
-                    nodes=[node, tag_node, picture_node]
+                    nodes=all_nodes
                 )
+
+                # picture_node = Node(
+                #     uin=botid,
+                #     name="仙人",
+                #     content=
+                #     [
+                #         Image.fromFileSystem("./data/plugins/astrbot_plugins_JMPlugins/result.jpg")
+                #     ]
+                # )
+                # resNode = Nodes(
+                #     nodes=[node, tag_node, picture_node]
+                # )
                 yield event.chain_result([resNode])
 
             except Exception as e:
@@ -685,12 +745,12 @@ class MyPlugin(Star):
         ''' 这是一个 帮助 指令'''
         str = ""
         str += "本插件提供以下指令：\n"
-        str += "name [id]：获取本子名称(以及封面图)\n"
+        str += "id [id]：获取本子名称(以及封面图)\n"
         str += "rank [m/w/d/a]：获取本子排行榜\n"
         str += "rand：随机获取本子\n"
         str += "key [关键字]：根据关键字搜索本子\n"
         str += "history：获取本子历史记录\n"
-        str += "对图片回复/search   ：搜索图片\n"
+        # str += "对图片回复/search   ：搜索图片\n"
 
         botid = event.get_self_id()
         from astrbot.api.message_components import Node, Plain, Image
@@ -702,6 +762,29 @@ class MyPlugin(Star):
             ]
         )
         yield event.chain_result([node])
+
+    @jm_command_group.command("set")
+    async def jm_set_command(self, event: AstrMessageEvent, value: str):
+        ''' 这是一个 设置发送图片数量 指令'''
+        if event.get_message_type() == MessageType.FRIEND_MESSAGE:
+            if event.get_sender_id() not in white_list_user:
+                yield event.plain_result("该指令仅限管理员使用")
+                return
+        if event.get_message_type() == MessageType.GROUP_MESSAGE:
+            if event.get_group_id() not in white_list_group:
+                yield event.plain_result("该群没有权限使用该指令")
+                return
+        global img_count
+        if value.isdigit():
+            value=int(value)
+            if value <1:
+                yield event.plain_result("数量不能小于1")
+            else:
+                img_count = int(value)
+                yield event.plain_result(f"发送图片数量已设置为{img_count}")
+        else:
+            yield event.plain_result("参数错误，请使用数字")
+
 
     @filter.command("search")
     async def jm_search_command(self, event: AstrMessageEvent):

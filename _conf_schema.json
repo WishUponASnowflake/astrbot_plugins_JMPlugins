@@ -13,5 +13,12 @@
         "hint": "冷却时间，单位为秒",
         "obvious_hint": true,
         "default":30
+    },
+    "img_count": {
+        "description": "图片数量",
+        "type": "int",
+        "hint": "发送图片数量，0为不发送",
+        "obvious_hint": true,
+        "default": 8
     }
 }
