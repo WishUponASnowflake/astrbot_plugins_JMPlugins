@@ -151,6 +151,7 @@ class MyPlugin(Star):
                     yield event.plain_result("未检测到正确的编号")
                     return
 
+
         # 检测是否在黑名单中
         if name in block_list:
             yield event.plain_result("该本子已被屏蔽,请窒息")
@@ -394,7 +395,7 @@ class MyPlugin(Star):
 
             flag02 = 0
         # 随机获取本子
-        random_album = random.randint(1, 1100000)
+        random_album = random.randint(1, 1210000)
         album = ''
         empty_tag = 0
         try:
@@ -422,7 +423,7 @@ class MyPlugin(Star):
         yield event.chain_result(chain)
 
     @jm_command_group.command("key")
-    async def jm_key_command(self, event: AstrMessageEvent, key: str):
+    async def jm_key_command(self, event: AstrMessageEvent, key: str,filterid: str = "0"):
         ''' 这是一个 根据关键字搜索本子 指令'''
         global last_search_comic_time, Current_search_comic_time, flag04
         Cover_tag2 = 0
@@ -460,9 +461,21 @@ class MyPlugin(Star):
         if empty_tag == 1:
             yield event.plain_result("未找到该关键字相关的本子")
         else:
+            # 判断是否有要过滤的
+            int_filterid=0
+            if filterid.isdigit():
+                int_filterid = int(filterid)
+            else:
+                pass
             str = ''
+
             for album_id, title in album:
+                if int(album_id) < int_filterid:
+                    continue
                 str += f"{album_id}:{title}\n"
+
+            if str =='':
+                str="未搜索到结果"
 
             botid = event.get_self_id()
             from astrbot.api.message_components import Node, Plain, Image
@@ -752,7 +765,7 @@ class MyPlugin(Star):
         str += "id [id] {f/F}：获取本子名称(以及封面图),后面加上参数f/F会不只发送封面图，不添加参数默认只发送封面图\n"
         str += "rank [m/w/d/a]：获取本子排行榜\n"
         str += "rand：随机获取本子\n"
-        str += "key [关键字]：根据关键字搜索本子\n"
+        str += "key [关键字] {filter_id=0}：根据关键字搜索本子,并且过滤掉比{filter_id}小的本子\n"
         str += "history：获取本子历史记录\n"
         # str += "对图片回复/search   ：搜索图片\n"
 
