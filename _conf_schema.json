@@ -20,5 +20,12 @@
         "hint": "发送图片数量，0为不发送",
         "obvious_hint": true,
         "default": 8
+    },
+     "cover_count": {
+        "description": "封面数量",
+        "type": "int",
+        "hint": "key搜索时候最大发送的封面数量",
+        "obvious_hint": true,
+        "default": 15
     }
 }

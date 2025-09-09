@@ -26,6 +26,7 @@ global last_search_comic_time, Current_search_comic_time, flag04
 global ispicture
 
 global img_count
+global cover_count
 
 
 option_url = "./data/plugins/astrbot_plugins_JMPlugins/option.yml"
@@ -61,10 +62,11 @@ class MyPlugin(Star):
         last_search_comic_time = 0
 
         # 加载设置
-        global ispicture, CoolDownTime,img_count
+        global ispicture, CoolDownTime,img_count,cover_count
         self.config = config
         CoolDownTime = self.config["CD_Time"]
         img_count = self.config["img_count"]
+        cover_count=self.config["cover_count"]
         if self.config["IsPicture"] >= 1:
             ispicture = True
         else:
@@ -395,7 +397,17 @@ class MyPlugin(Star):
 
             flag02 = 0
         # 随机获取本子
-        random_album = random.randint(1, 1210000)
+        #获取当前最新编号
+        client = JmOption.copy_option(option).new_jm_client()
+        album: JmSearchPage = client.search_site(search_query="blue archive", page=1)
+        latest_id, _ = next(iter(album))
+        #print(latest_id)
+        try:
+            latest_id_int=int(latest_id)
+        except:
+            latest_id_int = 1230000
+
+        random_album = random.randint(1, latest_id_int)
         album = ''
         empty_tag = 0
         try:
@@ -423,7 +435,7 @@ class MyPlugin(Star):
         yield event.chain_result(chain)
 
     @jm_command_group.command("key")
-    async def jm_key_command(self, event: AstrMessageEvent, key: str,filterid: str = "0"):
+    async def jm_key_command(self, event: AstrMessageEvent, key: str,filterid: str = "0", IsSendAllstr = "n"):
         ''' 这是一个 根据关键字搜索本子 指令'''
         global last_search_comic_time, Current_search_comic_time, flag04
         Cover_tag2 = 0
@@ -467,26 +479,121 @@ class MyPlugin(Star):
                 int_filterid = int(filterid)
             else:
                 pass
-            str = ''
 
-            for album_id, title in album:
-                if int(album_id) < int_filterid:
-                    continue
-                str += f"{album_id}:{title}\n"
+            #判断只是发名字还是把封面
+            if IsSendAllstr=="Y" or IsSendAllstr == "y":
+                #取出符合条件的album_id
+                result_album_id=[]
+                result_album_title=[]
+                for album_id, title in album:
+                    if int(album_id) < int_filterid:
+                         continue
+                    result_album_id.append(album_id)
+                    result_album_title.append(title)
 
-            if str =='':
-                str="未搜索到结果"
+                #下载封面，按照albumid顺序下载
+                folder_path = './data/plugins/astrbot_plugins_JMPlugins/pic/'
+                count= len(result_album_id)
+                maxcount=15
 
-            botid = event.get_self_id()
-            from astrbot.api.message_components import Node, Plain, Image
-            node = Node(
-                uin=botid,
-                name="仙人",
-                content=[
-                    Plain(str)
-                ]
-            )
-            yield event.chain_result([node])
+                global cover_count
+
+                yield event.plain_result(f"找到{count}个结果，正在下载封面,最多下载{cover_count}个封面")
+                count=min(cover_count,count)
+
+                for i in range(count):
+                    try:
+                        client = JmOption.copy_option(option).new_jm_client()
+                        page = client.search_site(search_query=result_album_id[i])
+                        album: JmAlbumDetail = page.single_album
+                    except:
+                       continue
+
+                    photo: JmPhotoDetail = album.getindex(0)
+                    photo01 = client.get_photo_detail(photo.photo_id, False)
+
+                    image: JmImageDetail = photo01[0]
+                    if os.path.exists(os.path.join(folder_path, f'{i}.jpg')):
+                        os.remove(os.path.join(folder_path, f'{i}.jpg'))
+                    client.download_by_image_detail(image, os.path.join(folder_path, f'{i}.jpg'))
+
+                #添加防挡
+                for i in range(count):
+                    image_path= os.path.join(folder_path, f'{i}.jpg')
+                    if os.path.exists(image_path):
+                        from PIL import Image as ProcessImage
+                        original_image = ProcessImage.open(image_path)
+                        # 获取原始图片的宽度和高度
+                        width, height = original_image.size
+                        # 创建一张新的空白图片，大小为原图的宽度和五倍高度
+                        new_image = ProcessImage.new('RGB', (width, height * 5+200), color=(255, 255, 255))
+                        # 将原图粘贴到新图片的下半部分
+                        new_image.paste(original_image, (0, height * 4))
+                        # 保存最终结果
+                        new_image.save(image_path)
+
+                #添加到node里面并发送
+                All_nodes=[]
+                from astrbot.api.message_components import Node, Plain, Image
+                botid=event.get_self_id()
+                for i in range(count):
+                    node = Node(
+                        uin=botid,
+                        name="仙人",
+                        content=
+                        [
+                            Plain("...\n"),
+                            Plain(f"id:{result_album_id[i]}\n"),
+                            Plain(f"本子名称：{result_album_title[i]}\n"),
+                        ]
+                    )
+                    img_path=os.path.join(folder_path, f'{i}.jpg')
+                    if os.path.exists(img_path):
+                        pic_node=Node(
+                            uin=botid,
+                            name="仙人",
+                            content=[
+                                Image.fromFileSystem(img_path)
+                            ]
+                        )
+                    else:
+                        pic_node = Node(
+                            uin=botid,
+                            name="仙人",
+                            content=[
+                               Plain("未找到封面或者封面下载失败请窒息")
+                            ]
+                        )
+                    All_nodes.append(node)
+                    All_nodes.append(pic_node)
+
+                    resNode = Nodes(
+                        nodes=All_nodes
+                    )
+
+                yield event.chain_result([resNode])
+
+            else:
+                str = ''
+
+                for album_id, title in album:
+                    if int(album_id) < int_filterid:
+                        continue
+                    str += f"{album_id}:{title}\n"
+
+                if str =='':
+                    str="未搜索到结果"
+
+                botid = event.get_self_id()
+                from astrbot.api.message_components import Node, Plain, Image
+                node = Node(
+                    uin=botid,
+                    name="仙人",
+                    content=[
+                        Plain(str)
+                    ]
+                )
+                yield event.chain_result([node])
 
     @filter.permission_type(PermissionType.ADMIN)
     @jm_command_group.command("promote")
