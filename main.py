@@ -2,12 +2,14 @@ import os
 import re
 from datetime import datetime
 import random
+
 from PicImageSearch import Ascii2D, Network, Google
 from PicImageSearch.model import GoogleResponse
 
 from jmcomic import JmOption, JmAlbumDetail, JmHtmlClient, JmModuleConfig, JmApiClient, create_option_by_file, \
     JmSearchPage, JmPhotoDetail, JmImageDetail, JmCategoryPage, JmMagicConstants
 
+from astrbot.api import event
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.core import AstrBotConfig
@@ -15,6 +17,7 @@ from astrbot.core.message.components import Plain, Reply, File, Nodes
 
 from astrbot.core.platform import MessageType
 import json
+import asyncio
 
 from astrbot.core.star.filter.permission import PermissionType
 from astrbot.api.star import StarTools
@@ -27,6 +30,10 @@ global ispicture
 
 global img_count
 global cover_count
+
+
+# 定时任务需要的import
+from .ScheduledTask import search_title_and_pic
 
 
 option_url = "./data/plugins/astrbot_plugins_JMPlugins/option.yml"
@@ -110,7 +117,6 @@ class MyPlugin(Star):
             with open(favorite_path, 'r') as file:
                 data = json.load(file)
                 favor_list = data["albumID"]
-
     @filter.command_group("JM")
     async def jm_command_group(self, event: AstrMessageEvent):
         ...
@@ -485,6 +491,7 @@ class MyPlugin(Star):
                 #取出符合条件的album_id
                 result_album_id=[]
                 result_album_title=[]
+                result_tag=[]
                 for album_id, title in album:
                     if int(album_id) < int_filterid:
                          continue
@@ -507,7 +514,10 @@ class MyPlugin(Star):
                         page = client.search_site(search_query=result_album_id[i])
                         album: JmAlbumDetail = page.single_album
                     except:
-                       continue
+                        result_tag.append(" ")
+                        continue
+
+                    result_tag.append(album.tags)
 
                     photo: JmPhotoDetail = album.getindex(0)
                     photo01 = client.get_photo_detail(photo.photo_id, False)
@@ -545,6 +555,7 @@ class MyPlugin(Star):
                             Plain("...\n"),
                             Plain(f"id:{result_album_id[i]}\n"),
                             Plain(f"本子名称：{result_album_title[i]}\n"),
+                            Plain(f"tag:{result_tag[i]}")
                         ]
                     )
                     img_path=os.path.join(folder_path, f'{i}.jpg')
@@ -594,6 +605,66 @@ class MyPlugin(Star):
                     ]
                 )
                 yield event.chain_result([node])
+
+    @jm_command_group.command("autokey")
+    async def jm_autokey_command(self, event: AstrMessageEvent):
+        if event.get_message_type() == MessageType.FRIEND_MESSAGE:
+            if event.get_sender_id() not in white_list_user:
+                yield event.plain_result("该指令仅限管理员使用")
+                return
+        if event.get_message_type() == MessageType.GROUP_MESSAGE:
+            if event.get_group_id() not in white_list_group:
+                yield event.plain_result("该群没有权限使用该指令")
+                return
+
+        yield event.plain_result("正在自动搜索")
+        folder_path = './data/plugins/astrbot_plugins_JMPlugins/pic/'
+        global cover_count
+        # 定时任务
+        result_album_id,result_album_title,result_tag = search_title_and_pic(folder_path,option,cover_count)
+        count = len(result_album_id)
+
+        All_nodes = []
+        from astrbot.api.message_components import Node, Plain, Image
+        botid = event.get_self_id()
+        for i in range(count):
+            node = Node(
+                uin=botid,
+                name="仙人",
+                content=
+                [
+                    Plain("...\n"),
+                    Plain(f"id:{result_album_id[i]}\n"),
+                    Plain(f"本子名称：{result_album_title[i]}\n"),
+                    Plain(f"标签：{result_tag[i]}\n"),
+                ]
+            )
+            img_path = os.path.join(folder_path, f'{i}.jpg')
+            if os.path.exists(img_path):
+                pic_node = Node(
+                    uin=botid,
+                    name="仙人",
+                    content=[
+                        Image.fromFileSystem(img_path)
+                    ]
+                )
+            else:
+                pic_node = Node(
+                    uin=botid,
+                    name="仙人",
+                    content=[
+                        Plain("未找到封面或者封面下载失败请窒息")
+                    ]
+                )
+            All_nodes.append(node)
+            All_nodes.append(pic_node)
+
+            resNode = Nodes(
+                nodes=All_nodes
+            )
+
+        yield event.chain_result([resNode])
+
 
     @filter.permission_type(PermissionType.ADMIN)
     @jm_command_group.command("promote")
@@ -1015,114 +1086,3 @@ class MyPlugin(Star):
                 print(e)
                 yield event.plain_result("搜索图片失败")
 
-    # @filter.command("google")
-    # async def jm_google_command(self, event: AstrMessageEvent):
-    #     ''' 这是一个 搜索图片 指令'''
-    #     if event.get_message_type() == MessageType.FRIEND_MESSAGE:
-    #         if event.get_sender_id() not in white_list_user:
-    #             yield event.plain_result("该指令仅限管理员使用")
-    #             return
-    #     if event.get_message_type() == MessageType.GROUP_MESSAGE:
-    #         if event.get_group_id() not in white_list_group:
-    #             yield event.plain_result("该群没有权限使用该指令")
-    #             return
-    #
-    #     global last_search_picture_time, Current_search_picture_time, flag03
-    #     Current_search_picture_time = int(datetime.now().timestamp())
-    #     time_diff_in_seconds = Current_search_picture_time - last_search_picture_time
-    #     last_search_picture_time = Current_search_picture_time
-    #     if time_diff_in_seconds < CoolDownTime:
-    #         cd_time = CoolDownTime - time_diff_in_seconds
-    #         if flag03 == 0:
-    #             flag03 += 1
-    #             yield event.plain_result(f"进CD了，请{cd_time}秒后再试")
-    #         else:
-    #             flag03 += 1
-    #         return
-    #     flag03 = 0
-    #
-    #     image_url = ''
-    #     message_chain = event.get_messages()
-    #     for msg in message_chain:
-    #         # print(msg)
-    #         # print("\n")
-    #         if msg.type == 'Image':
-    #             PictureID = msg.file
-    #             print(f"图片ID: {PictureID}")
-    #             from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
-    #             assert isinstance(event, AiocqhttpMessageEvent)
-    #             client = event.bot
-    #             payloads2 = {
-    #                 "file_id": PictureID
-    #             }
-    #             response = await client.api.call_action('get_image', **payloads2)  # 调用 协议端  API
-    #             # print(response)
-    #             image_url = response['file']
-    #
-    #         elif msg.type == 'Reply':
-    #             # 处理回复消息
-    #             from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
-    #             assert isinstance(event, AiocqhttpMessageEvent)
-    #             client = event.bot
-    #             payload = {
-    #                 "message_id": msg.id
-    #             }
-    #             response = await client.api.call_action('get_msg', **payload)  # 调用 协议端  API
-    #             # print(response)
-    #             reply_msg = response['message']
-    #             for msg in reply_msg:
-    #                 if msg['type'] == 'image':
-    #                     from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import \
-    #                         AiocqhttpMessageEvent
-    #                     assert isinstance(event, AiocqhttpMessageEvent)
-    #                     client = event.bot
-    #                     payloads2 = {
-    #                         "file_id": msg['data']['file']
-    #                     }
-    #                     response = await client.api.call_action('get_image', **payloads2)  # 调用 协议端  API
-    #                     image_url = response['file']
-    #
-    #     print(f"图片URL: {image_url}")
-    #     if image_url == '':
-    #         yield event.plain_result("未检测到图片")
-    #         return
-    #     else:
-    #         try:
-    #             # async with Network(proxies="http://127.0.0.1:12334") as client:
-    #             #     engin = EHentai(client=client, is_ex=False, similar=True, covers=False)
-    #             #     # result = await search_engin(engin,image_path)  # 使用 await 来等待异步函数
-    #             #     result = await engin.search(file=image_url)
-    #             cookie = "NID=524=cs5kw-q_FYZlcFdaOs7dFEGnFCWs3Pde4JzYaM8_tsgStTXcsxkrtVQgZrtkVQgvwGsYvTNcmQJFa3qN9TpYGQv5Fr9T19jHrwgEdVw2vraNQ2Kjva1y6ikxBzOy2vO02H0bikIr_4sPBf-cV3lw5oZ4fF_t-v6FKs9R7RDHvPg7LMUO5lzp3QsKJpEmaGIOD7f14XGfrxeA-XCCLX4ZHjrgvsHd1xlqcKxIsMfVKhEyYhJtA6zXV3EkBzY6cUA"
-    #             async with Network(cookies=cookie, proxies="http://127.0.0.1:12334") as client:
-    #                 engin = Google(client=client)
-    #                 resp: GoogleResponse = await engin.search(file=image_url)
-    #
-    #                 res02 = resp.raw
-    #                 rescount = len(res02)
-    #                 resStr = ""
-    #                 if rescount == 0:
-    #                     yield event.plain_result("未找到相关结果")
-    #                     return
-    #                 else:
-    #                     count = 0
-    #                     for row in res02:
-    #                         resStr += f"{row.title}\n{row.url}\n"
-    #                         count += 1
-    #                         if count == 6:
-    #                             break
-    #
-    #                     botid = event.get_self_id()
-    #                     from astrbot.api.message_components import Node, Plain, Image
-    #                     node = Node(
-    #                         uin=botid,
-    #                         name="仙人",
-    #                         content=[
-    #                             Plain("找到相似图片：\n"),
-    #                             Plain(resStr)
-    #                         ]
-    #                     )
-    #                     yield event.chain_result([node])
-    #
-    #         except Exception as e:
-    #             print(e)
-    #             yield event.plain_result("搜索图片失败")
