@@ -20,6 +20,59 @@ qq疑似会检测转发的聊天记录里面的图片，有时候被检测到了
 在图片的上面添加一长条白色的图，来隐藏图片的真实信息。这样被检测到的记录就会变小。  
 
 
+## 定时任务（自动发送指定key下前一段时间内更新的本）
+插件会定时用配置好的key去查询，并且过滤到上一次查询的时间段内更新的本。    
+该功能默认不开启，建议完全懂得如何使用的用户才考虑开启。  
+开启方式：在插件控制台里面，修改**定时任务 (schdule_task)**为1，然后保存。  
+之后，在想要定时发送的群/私人聊天里面输入/JM addlist添加到列表中。之后，定时任务就会自动执行。  
+目前默认的参数为：定时任务执行时间：8:00 20:00 如有需要修改，请自行到源文件中找到以下代码，并且根据提示修改。  
+```angular2html
+# 设置定时任务
+        # 初始化 APScheduler
+        if schdule_task != 0:
+            self.scheduler = AsyncIOScheduler()
+            self.scheduler.add_job(
+                self.send_daily_comics_task,
+                CronTrigger(hour='8,20', minute=0), #修改为你需要的时间
+                # IntervalTrigger(minutes=5),
+                id='daily_comic_send'
+            )
+            self.scheduler.start()
+            print("APScheduler 定时任务已启动")
+
+```
+
+查询key：找到module.json这个文件，找到以下内容，修改key为你自己的key。当前默认key为blue archive。  
+```angular2html
+{
+  "static_config": {
+    "query_key": "ブルーアーカイブ", #修改为你自己想要查询的key
+    "unified_msg": [
+    ]
+  },
+  "dynamic_config": {
+    "last_album_id": "1230010"
+  }
+}
+```
+
+由于当前没找到好的方法，当前定时任务发送的聊天记录当中的botid是空的，如要使用请自行修改。  
+找到以下代码，根据提示修改:  
+```angular2html
+ async def send_daily_comics_task(self):
+        """每日推送任务"""
+        try:
+            print(f"开始执行每日任务: {datetime.now()}")
+            await send_daily_message(self.context, "修改为你的botid")
+            print(f"每日任务执行完成: {datetime.now()}")
+        except Exception as e:
+            print(f"定时任务执行失败: {e}")
+            import traceback
+            traceback.print_exc()
+```
+
+
+
 ## 功能
 1 .根据id查询作品  
 指令格式： /JM id id/包含神秘id的句子 (f)  
@@ -60,6 +113,9 @@ eg: /JM key 碧蓝档案 1230000 Y
 
 **注意：该指令仅限管理员使用，需要在Astrbot控制台给对应账号添加为管理员才能使用。**
 
+此外，权限管理也包括定时任务的管理。  
+添加到队列当中： /JM addlist    
+从队列中删除： /JM removelist  
 
 7 .黑名单功能
 指令格式： /JM block add/remove albumid  

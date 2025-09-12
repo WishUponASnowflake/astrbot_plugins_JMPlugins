@@ -1,19 +1,22 @@
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 
 from PicImageSearch import Ascii2D, Network, Google
 from PicImageSearch.model import GoogleResponse
+from apscheduler.triggers.interval import IntervalTrigger
 
 from jmcomic import JmOption, JmAlbumDetail, JmHtmlClient, JmModuleConfig, JmApiClient, create_option_by_file, \
     JmSearchPage, JmPhotoDetail, JmImageDetail, JmCategoryPage, JmMagicConstants
 
+import astrbot.api.event
 from astrbot.api import event
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.core import AstrBotConfig
 from astrbot.core.message.components import Plain, Reply, File, Nodes
+from astrbot.core.message.message_event_result import MessageChain
 
 from astrbot.core.platform import MessageType
 import json
@@ -31,9 +34,15 @@ global ispicture
 global img_count
 global cover_count
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+
+
+
 
 # 定时任务需要的import
-from .ScheduledTask import search_title_and_pic
+from .ScheduledTask import *
 
 
 option_url = "./data/plugins/astrbot_plugins_JMPlugins/option.yml"
@@ -56,7 +65,6 @@ def get_number_from_str(str):
 
 global option
 
-
 @register("JMPlugins", "orchidsziyou", "查询本子名字插件", "1.0.0")
 class MyPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
@@ -74,11 +82,25 @@ class MyPlugin(Star):
         CoolDownTime = self.config["CD_Time"]
         img_count = self.config["img_count"]
         cover_count=self.config["cover_count"]
+        schdule_task=self.config["schdule_task"]
         if self.config["IsPicture"] >= 1:
             ispicture = True
         else:
             ispicture = False
         print(ispicture, CoolDownTime)
+
+        # 设置定时任务
+        # 初始化 APScheduler
+        if schdule_task != 0:
+            self.scheduler = AsyncIOScheduler()
+            self.scheduler.add_job(
+                self.send_daily_comics_task,
+                CronTrigger(hour='8,20', minute=0),
+                # IntervalTrigger(minutes=5),
+                id='daily_comic_send'
+            )
+            self.scheduler.start()
+            print("APScheduler 定时任务已启动")
 
         # 加载白名单
         global datadir, white_list_path, history_json_path, blocklist_path, block_list,favorite_path,favor_list
@@ -117,6 +139,18 @@ class MyPlugin(Star):
             with open(favorite_path, 'r') as file:
                 data = json.load(file)
                 favor_list = data["albumID"]
+
+    async def send_daily_comics_task(self):
+        """每日推送任务"""
+        try:
+            print(f"开始执行每日任务: {datetime.now()}")
+            await send_daily_message(self.context, "123321123")
+            print(f"每日任务执行完成: {datetime.now()}")
+        except Exception as e:
+            print(f"定时任务执行失败: {e}")
+            import traceback
+            traceback.print_exc()
+
     @filter.command_group("JM")
     async def jm_command_group(self, event: AstrMessageEvent):
         ...
@@ -606,65 +640,64 @@ class MyPlugin(Star):
                 )
                 yield event.chain_result([node])
 
-    @jm_command_group.command("autokey")
-    async def jm_autokey_command(self, event: AstrMessageEvent):
-        if event.get_message_type() == MessageType.FRIEND_MESSAGE:
-            if event.get_sender_id() not in white_list_user:
-                yield event.plain_result("该指令仅限管理员使用")
-                return
-        if event.get_message_type() == MessageType.GROUP_MESSAGE:
-            if event.get_group_id() not in white_list_group:
-                yield event.plain_result("该群没有权限使用该指令")
-                return
-
-        yield event.plain_result("正在自动搜索")
-        folder_path = './data/plugins/astrbot_plugins_JMPlugins/pic/'
-        global cover_count
-        # 定时任务
-        result_album_id,result_album_title,result_tag = search_title_and_pic(folder_path,option,cover_count)
-        count = len(result_album_id)
-
-        All_nodes = []
-        from astrbot.api.message_components import Node, Plain, Image
-        botid = event.get_self_id()
-        for i in range(count):
-            node = Node(
-                uin=botid,
-                name="仙人",
-                content=
-                [
-                    Plain("...\n"),
-                    Plain(f"id:{result_album_id[i]}\n"),
-                    Plain(f"本子名称：{result_album_title[i]}\n"),
-                    Plain(f"标签：{result_tag[i]}\n"),
-                ]
-            )
-            img_path = os.path.join(folder_path, f'{i}.jpg')
-            if os.path.exists(img_path):
-                pic_node = Node(
-                    uin=botid,
-                    name="仙人",
-                    content=[
-                        Image.fromFileSystem(img_path)
-                    ]
-                )
-            else:
-                pic_node = Node(
-                    uin=botid,
-                    name="仙人",
-                    content=[
-                        Plain("未找到封面或者封面下载失败请窒息")
-                    ]
-                )
-            All_nodes.append(node)
-            All_nodes.append(pic_node)
-
-            resNode = Nodes(
-                nodes=All_nodes
-            )
-
-        yield event.chain_result([resNode])
-
+    # @jm_command_group.command("autokey")
+    # async def jm_autokey_command(self, event: AstrMessageEvent):
+    #     if event.get_message_type() == MessageType.FRIEND_MESSAGE:
+    #         if event.get_sender_id() not in white_list_user:
+    #             yield event.plain_result("该指令仅限管理员使用")
+    #             return
+    #     if event.get_message_type() == MessageType.GROUP_MESSAGE:
+    #         if event.get_group_id() not in white_list_group:
+    #             yield event.plain_result("该群没有权限使用该指令")
+    #             return
+    #
+    #     yield event.plain_result("正在自动搜索")
+    #     folder_path = './data/plugins/astrbot_plugins_JMPlugins/pic/'
+    #     global cover_count
+    #     # 定时任务
+    #     result_album_id,result_album_title,result_tag = search_title_and_pic(folder_path,option,cover_count)
+    #     count = len(result_album_id)
+    #
+    #     All_nodes = []
+    #     from astrbot.api.message_components import Node, Plain, Image
+    #     botid = event.get_self_id()
+    #     for i in range(count):
+    #         node = Node(
+    #             uin=botid,
+    #             name="仙人",
+    #             content=
+    #             [
+    #                 Plain("...\n"),
+    #                 Plain(f"id:{result_album_id[i]}\n"),
+    #                 Plain(f"本子名称：{result_album_title[i]}\n"),
+    #                 Plain(f"标签：{result_tag[i]}\n"),
+    #             ]
+    #         )
+    #         img_path = os.path.join(folder_path, f'{i}.jpg')
+    #         if os.path.exists(img_path):
+    #             pic_node = Node(
+    #                 uin=botid,
+    #                 name="仙人",
+    #                 content=[
+    #                     Image.fromFileSystem(img_path)
+    #                 ]
+    #             )
+    #         else:
+    #             pic_node = Node(
+    #                 uin=botid,
+    #                 name="仙人",
+    #                 content=[
+    #                     Plain("未找到封面或者封面下载失败请窒息")
+    #                 ]
+    #             )
+    #         All_nodes.append(node)
+    #         All_nodes.append(pic_node)
+    #
+    #         resNode = Nodes(
+    #             nodes=All_nodes
+    #         )
+    #
+    #     yield event.chain_result([resNode])
 
     @filter.permission_type(PermissionType.ADMIN)
     @jm_command_group.command("promote")
@@ -1085,4 +1118,106 @@ class MyPlugin(Star):
             except Exception as e:
                 print(e)
                 yield event.plain_result("搜索图片失败")
+
+
+    #设置定时任务，获取群聊/私聊的消息串
+    @filter.permission_type(PermissionType.ADMIN)
+    @jm_command_group.command("addlist")
+    async def jm_addlist_command(self, event: AstrMessageEvent):
+        """ 这是一个 添加群聊/私聊消息串 指令"""
+        umo = event.unified_msg_origin
+        print(umo)
+        add_unified_msg(umo)
+        yield event.plain_result(f"添加成功")
+    @filter.permission_type(PermissionType.ADMIN)
+    @jm_command_group.command("removelist")
+    async def jm_removelist_command(self, event: AstrMessageEvent):
+        """ 这是一个 删除群聊/私聊消息串 指令"""
+        umo = event.unified_msg_origin
+        remove_unified_msg(umo)
+        yield event.plain_result(f"删除成功")
+
+        
+async def test_send_message(context: Context):
+    umos = get_unified_msg()  # 修复：使用正确的函数获取消息列表
+    print(umos)
+    from astrbot.api.event import MessageChain
+    message_chain = MessageChain().message("Hello!")
+    for umo in umos:
+        try:
+            await context.send_message(umo, message_chain)  # 修复：使用await而不是yield
+        except Exception as e:
+            print(e)
+            continue
+
+async def send_daily_message(context: Context,botid):
+    # 下载图片
+    folder_path = './data/plugins/astrbot_plugins_JMPlugins/pic_daily/'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
+    global cover_count
+    # 定时任务
+    result_album_id, result_album_title, result_tag = search_title_and_pic(folder_path, option, cover_count)
+    count = len(result_album_id)
+
+    from astrbot.api.event import MessageChain
+    message_chain = MessageChain()
+
+    from astrbot.api.message_components import Node, Plain, Image
+
+    time_node =Node(
+        uin=botid,
+        name="仙人",
+        content=[
+            Plain("前一时间段内更新的本子有：")
+        ]
+    )
+    message_chain.chain.append(time_node)
+
+
+    for i in range(count):
+        node = Node(
+            uin=botid,
+            name="仙人",
+            content=
+            [
+                Plain("...\n"),
+                Plain(f"id:{result_album_id[i]}\n"),
+                Plain(f"本子名称：{result_album_title[i]}\n"),
+                Plain(f"标签：{result_tag[i]}\n"),
+            ]
+        )
+        img_path = os.path.join(folder_path, f'{i}.jpg')
+        if os.path.exists(img_path):
+            pic_node = Node(
+                uin=botid,
+                name="仙人",
+                content=[
+                    Image.fromFileSystem(img_path)
+                ]
+            )
+        else:
+            pic_node = Node(
+                uin=botid,
+                name="仙人",
+                content=[
+                    Plain("未找到封面或者封面下载失败请窒息")
+                ]
+            )
+
+        message_chain.chain.append(node)
+        message_chain.chain.append(pic_node)
+
+    umos = get_unified_msg()
+
+    for umo in umos:
+        try:
+            await context.send_message(umo, message_chain)
+        except Exception as e:
+            print(e)
+            continue
+
+
+
 

@@ -27,5 +27,12 @@
         "hint": "key搜索时候最大发送的封面数量",
         "obvious_hint": true,
         "default": 15
+    },
+     "schdule_task": {
+        "description": "定时任务",
+        "type": "int",
+        "hint": "是否开启定时任务，0为不开启，其余为开启，默认为0",
+        "obvious_hint": true,
+        "default": 0
     }
 }

@@ -1,8 +1,10 @@
 {
   "static_config": {
-    "query_key": "ブルーアーカイブ"
+    "query_key": "ブルーアーカイブ",
+    "unified_msg": [
+    ]
   },
   "dynamic_config": {
-    "last_album_id": "1213965"
+    "last_album_id": "1230010"
   }
 }
