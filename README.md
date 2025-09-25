@@ -6,7 +6,8 @@
 ## 依赖
 运行本插件需要安装以下包：  
 [jmcomic](https://github.com/hect0x7/JMComic-Crawler-Python)  
-[PicImageSearch](https://github.com/kitUIN/PicImageSearch)
+[PicImageSearch](https://github.com/kitUIN/PicImageSearch)  
+apscheduler(定时任务需要使用)  
 十分感谢以上作者提供的API。
 
 根据项目里面的requirements.txt安装依赖包。
