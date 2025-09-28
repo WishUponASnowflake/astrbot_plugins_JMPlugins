@@ -252,7 +252,7 @@ def search_title_and_pic(download_path, option,max_count=15):
     result_tag=[]
     for album_id, title in album:
         # print(f"{album_id} {title}")
-        if int(album_id) < int_filterid:
+        if int(album_id) <= int_filterid:
             continue
         result_album_id.append(album_id)
         result_album_title.append(title)
@@ -303,7 +303,8 @@ def search_title_and_pic(download_path, option,max_count=15):
             new_image.save(image_path)
 
     # 更新last_album_id
-    set_last_album_id(result_album_id[0])
+    if len(result_album_id) > 0 :
+        set_last_album_id(result_album_id[0])
 
 
     return result_album_id,result_album_title,result_tag

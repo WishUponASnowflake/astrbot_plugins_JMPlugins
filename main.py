@@ -1166,48 +1166,59 @@ async def send_daily_message(context: Context,botid):
 
     from astrbot.api.message_components import Node, Plain, Image
 
-    time_node =Node(
-        uin=botid,
-        name="仙人",
-        content=[
-            Plain("前一时间段内更新的本子有：")
-        ]
-    )
-    message_chain.chain.append(time_node)
-
-
-    for i in range(count):
-        node = Node(
+    if count == 0:
+        time_node = Node(
             uin=botid,
             name="仙人",
-            content=
-            [
-                Plain("...\n"),
-                Plain(f"id:{result_album_id[i]}\n"),
-                Plain(f"本子名称：{result_album_title[i]}\n"),
-                Plain(f"标签：{result_tag[i]}\n"),
+            content=[
+                Plain("前段时间没有更新新的本子，起飞失败")
             ]
         )
-        img_path = os.path.join(folder_path, f'{i}.jpg')
-        if os.path.exists(img_path):
-            pic_node = Node(
-                uin=botid,
-                name="仙人",
-                content=[
-                    Image.fromFileSystem(img_path)
-                ]
-            )
-        else:
-            pic_node = Node(
-                uin=botid,
-                name="仙人",
-                content=[
-                    Plain("未找到封面或者封面下载失败请窒息")
-                ]
-            )
+        message_chain.chain.append(time_node)
 
-        message_chain.chain.append(node)
-        message_chain.chain.append(pic_node)
+    else:
+
+        time_node =Node(
+            uin=botid,
+            name="仙人",
+            content=[
+                Plain("前一时间段内更新的本子有：")
+            ]
+        )
+        message_chain.chain.append(time_node)
+
+        for i in range(count):
+            node = Node(
+                uin=botid,
+                name="仙人",
+                content=
+                [
+                    Plain("...\n"),
+                    Plain(f"id:{result_album_id[i]}\n"),
+                    Plain(f"本子名称：{result_album_title[i]}\n"),
+                    Plain(f"标签：{result_tag[i]}\n"),
+                ]
+            )
+            img_path = os.path.join(folder_path, f'{i}.jpg')
+            if os.path.exists(img_path):
+                pic_node = Node(
+                    uin=botid,
+                    name="仙人",
+                    content=[
+                        Image.fromFileSystem(img_path)
+                    ]
+                )
+            else:
+                pic_node = Node(
+                    uin=botid,
+                    name="仙人",
+                    content=[
+                        Plain("未找到封面或者封面下载失败请窒息")
+                    ]
+                )
+
+            message_chain.chain.append(node)
+            message_chain.chain.append(pic_node)
 
     umos = get_unified_msg()
 
