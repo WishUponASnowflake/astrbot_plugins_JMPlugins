@@ -1160,6 +1160,7 @@ async def send_daily_message(context: Context,botid):
     # 定时任务
     result_album_id, result_album_title, result_tag = search_title_and_pic(folder_path, option, cover_count)
     count = len(result_album_id)
+    # print(len(result_album_id),len(result_album_title),len(result_tag))
 
     from astrbot.api.event import MessageChain
     message_chain = MessageChain()
@@ -1199,24 +1200,46 @@ async def send_daily_message(context: Context,botid):
                     Plain(f"标签：{result_tag[i]}\n"),
                 ]
             )
-            img_path = os.path.join(folder_path, f'{i}.jpg')
-            if os.path.exists(img_path):
-                pic_node = Node(
-                    uin=botid,
-                    name="仙人",
-                    content=[
-                        Image.fromFileSystem(img_path)
-                    ]
-                )
+            #判断tag里面是否有需要过滤的内容：
+            filter_tag = ['NTR','猎奇','寝取']
+            if any(tag in result_tag[i] for tag in filter_tag):
+                print("检测到了过滤内容")
+                # 检验是否有用来替换屏蔽图片的图片
+                pic_path="./data/plugins/astrbot_plugins_JMPlugins/seia_blockpic.jpg"
+                if os.path.exists(pic_path):
+                    pic_node = Node(
+                        uin=botid,
+                        name="仙人",
+                        content=[
+                            Image.fromFileSystem(pic_path)
+                        ]
+                    )
+                else:
+                    pic_node = Node(
+                        uin=botid,
+                        name="仙人",
+                        content=[
+                            Plain("检测到过滤内容，图片已屏蔽"),
+                        ]
+                    )
             else:
-                pic_node = Node(
-                    uin=botid,
-                    name="仙人",
-                    content=[
-                        Plain("未找到封面或者封面下载失败请窒息")
-                    ]
-                )
-
+                img_path = os.path.join(folder_path, f'{i}.jpg')
+                if os.path.exists(img_path):
+                    pic_node = Node(
+                        uin=botid,
+                        name="仙人",
+                        content=[
+                            Image.fromFileSystem(img_path)
+                        ]
+                    )
+                else:
+                    pic_node = Node(
+                        uin=botid,
+                        name="仙人",
+                        content=[
+                            Plain("未找到封面或者封面下载失败请窒息")
+                        ]
+                    )
             message_chain.chain.append(node)
             message_chain.chain.append(pic_node)
 

@@ -274,7 +274,7 @@ def search_title_and_pic(download_path, option,max_count=15):
             page = client.search_site(search_query=result_album_id[i])
             album_detail = page.single_album
         except:
-            result_tag.append(" ")
+            result_tag.append([" "])
             continue
         result_tag.append(album_detail.tags)
 
